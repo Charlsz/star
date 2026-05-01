@@ -1,2 +1,11 @@
-# star
-Space Taxonomy and Analysis Recognition
+# STAR
+
+**Space Taxonomy and Analysis Recognition**.
+
+## Installation
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
