@@ -1,14 +1,15 @@
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.optim import Adam
 
-from star.config import CLASS_NAMES, EPOCHS, LEARNING_RATE, MODEL_FILE, MODELS_DIR
+from star.config import MODEL_FILE, MODELS_DIR, EPOCHS, LEARNING_RATE
 from star.data import create_dataloaders
 
 
 class SimpleCNN(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes=2):
         super().__init__()
+
         self.features = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -36,11 +37,11 @@ class SimpleCNN(nn.Module):
         return x
 
 
-def evaluate(model, dataloader, loss_function, device):
+def evaluate(model, dataloader, criterion, device):
     model.eval()
     total_loss = 0.0
-    total_correct = 0
-    total_examples = 0
+    correct = 0
+    total = 0
 
     with torch.no_grad():
         for images, labels in dataloader:
@@ -48,31 +49,34 @@ def evaluate(model, dataloader, loss_function, device):
             labels = labels.to(device)
 
             outputs = model(images)
-            loss = loss_function(outputs, labels)
+            loss = criterion(outputs, labels)
 
             total_loss += loss.item() * images.size(0)
             predictions = outputs.argmax(dim=1)
-            total_correct += (predictions == labels).sum().item()
-            total_examples += labels.size(0)
+            correct += (predictions == labels).sum().item()
+            total += labels.size(0)
 
-    average_loss = total_loss / total_examples
-    accuracy = total_correct / total_examples
-    return average_loss, accuracy
+    avg_loss = total_loss / total
+    accuracy = correct / total
+    return avg_loss, accuracy
 
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_loader, val_loader, _ = create_dataloaders()
 
-    model = SimpleCNN(num_classes=len(CLASS_NAMES)).to(device)
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    train_loader, val_loader, test_loader = create_dataloaders()
 
-    for epoch in range(1, EPOCHS + 1):
+    model = SimpleCNN(num_classes=2).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
+
+    best_val_loss = float("inf")
+
+    for epoch in range(EPOCHS):
         model.train()
         total_loss = 0.0
-        total_correct = 0
-        total_examples = 0
+        correct = 0
+        total = 0
 
         for images, labels in train_loader:
             images = images.to(device)
@@ -80,30 +84,37 @@ def train():
 
             optimizer.zero_grad()
             outputs = model(images)
-            loss = loss_function(outputs, labels)
+            loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item() * images.size(0)
             predictions = outputs.argmax(dim=1)
-            total_correct += (predictions == labels).sum().item()
-            total_examples += labels.size(0)
+            correct += (predictions == labels).sum().item()
+            total += labels.size(0)
 
-        train_loss = total_loss / total_examples
-        train_accuracy = total_correct / total_examples
-        val_loss, val_accuracy = evaluate(model, val_loader, loss_function, device)
+        train_loss = total_loss / total
+        train_accuracy = correct / total
+
+        val_loss, val_accuracy = evaluate(model, val_loader, criterion, device)
 
         print(
-            f"Epoch {epoch}/{EPOCHS} | "
+            f"Epoch {epoch + 1}/{EPOCHS} | "
             f"train_loss={train_loss:.4f} | "
-            f"train_accuracy={train_accuracy:.4f} | "
+            f"train_acc={train_accuracy:.4f} | "
             f"val_loss={val_loss:.4f} | "
-            f"val_accuracy={val_accuracy:.4f}"
+            f"val_acc={val_accuracy:.4f}"
         )
 
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), MODEL_FILE)
-    print(f"Model saved to {MODEL_FILE}")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            MODELS_DIR.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), MODEL_FILE)
+
+    model.load_state_dict(torch.load(MODEL_FILE, map_location=device))
+    test_loss, test_accuracy = evaluate(model, test_loader, criterion, device)
+
+    print(f"test_loss={test_loss:.4f} | test_acc={test_accuracy:.4f}")
 
 
 if __name__ == "__main__":
