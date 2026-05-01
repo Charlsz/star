@@ -7,16 +7,55 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
 from star.config import (
+    DATA_DIR,
     LABELS_FILE,
-    IMAGE_DIR,
     CLASS_NAMES,
     IMAGE_SIZE,
     BATCH_SIZE,
     RANDOM_STATE,
 )
 
-
 LABEL_TO_INDEX = {label: index for index, label in enumerate(CLASS_NAMES)}
+
+RAW_GALAXY_ZOO_DIR = DATA_DIR / "raw" / "galaxy_zoo_2"
+RAW_LABELS_FILE = RAW_GALAXY_ZOO_DIR / "gz2_hart16.csv"
+RAW_MAPPING_FILE = RAW_GALAXY_ZOO_DIR / "gz2_filename_mapping.csv"
+RAW_IMAGE_DIR = RAW_GALAXY_ZOO_DIR / "images"
+
+SMOOTH_COLUMN = "t01_smooth_or_features_a01_smooth_debiased"
+FEATURED_COLUMN = "t01_smooth_or_features_a02_features_or_disk_debiased"
+
+
+def prepare_labels_file(threshold=0.8):
+    hart_df = pd.read_csv(RAW_LABELS_FILE)
+    mapping_df = pd.read_csv(RAW_MAPPING_FILE)
+
+    hart_df = hart_df.rename(columns={"dr7objid": "objid"})
+
+    dataframe = pd.merge(hart_df, mapping_df, on="objid", how="inner")
+
+    elliptical_df = dataframe[dataframe[SMOOTH_COLUMN] >= threshold].copy()
+    elliptical_df["label"] = "elliptical"
+
+    spiral_df = dataframe[dataframe[FEATURED_COLUMN] >= threshold].copy()
+    spiral_df["label"] = "spiral"
+
+    dataframe = pd.concat([elliptical_df, spiral_df], ignore_index=True)
+    dataframe = dataframe[["asset_id", "label"]].drop_duplicates(subset=["asset_id"])
+
+    dataframe["image_name"] = dataframe["asset_id"].astype(str) + ".jpg"
+    dataframe = dataframe[["image_name", "label"]]
+
+    dataframe["image_exists"] = dataframe["image_name"].apply(
+        lambda name: (RAW_IMAGE_DIR / name).exists()
+    )
+    dataframe = dataframe[dataframe["image_exists"]].copy()
+    dataframe = dataframe.drop(columns=["image_exists"])
+
+    LABELS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    dataframe.to_csv(LABELS_FILE, index=False)
+
+    return dataframe
 
 
 class GalaxyDataset(Dataset):
@@ -56,6 +95,9 @@ def get_transforms():
 
 
 def load_labels():
+    if not LABELS_FILE.exists():
+        prepare_labels_file()
+
     dataframe = pd.read_csv(LABELS_FILE)
     dataframe = dataframe[dataframe["label"].isin(CLASS_NAMES)].copy()
     return dataframe
@@ -84,9 +126,9 @@ def create_dataloaders():
     train_df, val_df, test_df = split_data(dataframe)
     train_transform, eval_transform = get_transforms()
 
-    train_dataset = GalaxyDataset(train_df, IMAGE_DIR, train_transform)
-    val_dataset = GalaxyDataset(val_df, IMAGE_DIR, eval_transform)
-    test_dataset = GalaxyDataset(test_df, IMAGE_DIR, eval_transform)
+    train_dataset = GalaxyDataset(train_df, RAW_IMAGE_DIR, train_transform)
+    val_dataset = GalaxyDataset(val_df, RAW_IMAGE_DIR, eval_transform)
+    test_dataset = GalaxyDataset(test_df, RAW_IMAGE_DIR, eval_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
