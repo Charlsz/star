@@ -39,8 +39,8 @@ Current classes:
 
 1. Clone the repository:
    ```bash
-   git clone <your-repository-url>
-   cd <your-project-folder>
+   git clone https://github.com/Charlsz/star.git
+   cd https://github.com/Charlsz/star.git
    ```
 
 2. Create and activate a virtual environment:
