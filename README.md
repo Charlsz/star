@@ -1,19 +1,34 @@
 # STAR
 
-A galaxy morphology classification app built with PyTorch and Streamlit.  
+Space Taxonomy and Analysis Recognition.
+
 Upload a galaxy image and the model predicts whether it is smooth or featured/disk, then shows the confidence and class probabilities.
-
-## Features
-
-- Upload a galaxy image through a simple web interface.
-- Predict the galaxy morphology class.
-- Display confidence for the predicted class.
-- Show probabilities for all available classes.
-- Run locally with Streamlit.
 
 ## Data source
 
 This project uses data from the Galaxy Zoo 2 public releases.
+
+Create the following folders inside `data/`:
+
+- `data/raw/`
+- `data/raw/galaxy_zoo_2/`
+
+The raw files should be placed in `data/raw/galaxy_zoo_2/` like this:
+
+```bash
+data/
+├── raw/
+│   └── galaxy_zoo_2/
+│       ├── gz2_hart16.csv.gz
+│       ├── gz2_filename_mapping.csv
+│       └── images/
+│           ├── image_1.jpg
+│           ├── image_2.jpg
+│           └── ...
+└── processed/
+```
+
+Download the raw files from the following sources:
 
 - **Morphology table:** `gz2_hart16.csv.gz` from the Galaxy Zoo data site  
   https://data.galaxyzoo.org/#section-8
@@ -23,6 +38,14 @@ This project uses data from the Galaxy Zoo 2 public releases.
 
 - **Image mapping file:** `gz2_filename_mapping.csv`, used to match image filenames with galaxy entries in the morphology table  
   https://zenodo.org/records/3565489/files/gz2_filename_mapping.csv?download=1
+
+After downloading:
+- Place `gz2_hart16.csv.` in `data/raw/galaxy_zoo_2/`
+- Place `gz2_filename_mapping.csv` in `data/raw/galaxy_zoo_2/`
+- Extract `images_gz2.zip`
+- Move the extracted `images/` folder into `data/raw/galaxy_zoo_2/`
+
+The processed files used during training are saved in `data/processed/`.
 
 The Galaxy Zoo 2 images are based on galaxies from the Sloan Digital Sky Survey (SDSS).
 
@@ -40,7 +63,7 @@ Current classes:
 1. Clone the repository:
    ```bash
    git clone https://github.com/Charlsz/star.git
-   cd <your-project-folder>
+   cd star
    ```
 
 2. Create and activate a virtual environment:
@@ -62,9 +85,25 @@ Current classes:
    pip install -r requirements.txt
    ```
 
+## How to train
+
+Before running the app, you need to train the model to generate the saved weights file used for prediction.
+
+Run:
+
+```bash
+python star/train.py
+```
+
+After training, the model weights will be saved as:
+
+```bash
+star_cnn.pt
+```
+
 ## How to run
 
-Start the Streamlit app with:
+After the model has been trained, start the Streamlit app with:
 
 ```bash
 python -m streamlit run star/app.py
