@@ -19,7 +19,7 @@ The raw files should be placed in `data/raw/galaxy_zoo_2/` like this:
 data/
 ├── raw/
 │   └── galaxy_zoo_2/
-│       ├── gz2_hart16.csv.gz
+│       ├── gz2_hart16.csv
 │       ├── gz2_filename_mapping.csv
 │       └── images/
 │           ├── image_1.jpg
